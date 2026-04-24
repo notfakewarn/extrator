@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Leads - Visualização</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <main class="container">
+      <h1>Painel de Leads</h1>
+      <p class="muted">Apenas dados coletados com consentimento. Sem scraping adicional.</p>
+
+      <section class="filters">
+        <label>
+          Origem
+          <select id="origem">
+            <option value="">Todas</option>
+            <option value="WhatsApp">WhatsApp</option>
+            <option value="site">site</option>
+            <option value="campanha">campanha</option>
+          </select>
+        </label>
+
+        <label>
+          Data início
+          <input id="startDate" type="datetime-local" />
+        </label>
+
+        <label>
+          Data fim
+          <input id="endDate" type="datetime-local" />
+        </label>
+
+        <label>
+          Status
+          <input id="status" type="text" placeholder="ex: novo" />
+        </label>
+
+        <label>
+          Tag
+          <input id="tag" type="text" placeholder="ex: vip" />
+        </label>
+
+        <div class="buttons">
+          <button id="buscarBtn">Buscar</button>
+          <button id="exportarBtn" class="secondary">Exportar CSV</button>
+        </div>
+      </section>
+
+      <section class="status-bar">
+        <span id="meta">Carregando...</span>
+        <span class="muted">Atualização automática a cada 10s</span>
+      </section>
+
+      <section class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Nome</th>
+              <th>Telefone</th>
+              <th>Origem</th>
+              <th>Data</th>
+              <th>Status</th>
+              <th>Tag</th>
+            </tr>
+          </thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </section>
+    </main>
+
+    <script>
+      const tbody = document.getElementById("tbody");
+      const meta = document.getElementById("meta");
+
+      function getFilters() {
+        const origem = document.getElementById("origem").value;
+        const startDate = document.getElementById("startDate").value;
+        const endDate = document.getElementById("endDate").value;
+        const status = document.getElementById("status").value;
+        const tag = document.getElementById("tag").value;
+
+        const params = new URLSearchParams();
+        if (origem) params.set("origem", origem);
+        if (startDate) params.set("start_date", new Date(startDate).toISOString());
+        if (endDate) params.set("end_date", new Date(endDate).toISOString());
+        if (status) params.set("status", status);
+        if (tag) params.set("tag", tag);
+        return params;
+      }
+
+      function renderRows(items) {
+        tbody.innerHTML = "";
+        if (!items.length) {
+          tbody.innerHTML = `<tr><td colspan="6" class="empty">Nenhum lead encontrado.</td></tr>`;
+          return;
+        }
+
+        const frag = document.createDocumentFragment();
+        items.forEach((lead) => {
+          const row = document.createElement("tr");
+          row.innerHTML = `
+            <td>${lead.nome ?? ""}</td>
+            <td>${lead.telefone ?? ""}</td>
+            <td>${lead.origem ?? ""}</td>
+            <td>${lead.data ?? ""}</td>
+            <td>${lead.status ?? ""}</td>
+            <td>${lead.tag ?? ""}</td>
+          `;
+          frag.appendChild(row);
+        });
+
+        tbody.appendChild(frag);
+      }
+
+      async function loadLeads() {
+        const params = getFilters();
+        const response = await fetch(`/leads?${params.toString()}`);
+        if (!response.ok) {
+          meta.textContent = `Erro ao carregar leads: ${response.status}`;
+          return;
+        }
+
+        const payload = await response.json();
+        meta.textContent = `${payload.count} leads | atualizado em ${new Date(payload.updated_at).toLocaleString()}`;
+        renderRows(payload.items);
+      }
+
+      function exportCsv() {
+        const params = getFilters();
+        window.open(`/export?${params.toString()}`, "_blank");
+      }
+
+      document.getElementById("buscarBtn").addEventListener("click", loadLeads);
+      document.getElementById("exportarBtn").addEventListener("click", exportCsv);
+
+      loadLeads();
+      setInterval(loadLeads, 10000);
+    </script>
+  </body>
+</html>
